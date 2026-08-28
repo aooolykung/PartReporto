@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ใบบันทึกการเปลี่ยนอะไหล่เครื่องจักร</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="csv-toolbar">
+    <label class="csv-upload">
+      อัปโหลด CSV
+      <input type="file" id="csv-file" accept=".csv,text/csv">
+    </label>
+    <button type="button" id="save-file">บันทึกไฟล์</button>
+    <label class="csv-upload">
+      เปิดไฟล์บันทึก
+      <input type="file" id="saved-file" accept=".json,application/json">
+    </label>
+  </div>
+  <main class="document">
+    <section class="page page-one" aria-label="หน้าที่ 1">
+      <header class="page-title">
+        <h1>ใบบันทึกการเปลี่ยนอะไหล่เครื่องจักร</h1>
+      </header>
+
+      <section class="form-section customer-section">
+        <h2 class="section-title">ข้อมูลลูกค้าและเครื่องจักร</h2>
+        <div class="field-grid customer-row row-one">
+          <label class="field"><span>ใบแจ้งซ่อม เลขที่</span><input type="number" name="repair_notice_no"></label>
+          <label class="field"><span>วันที่</span><input type="text" inputmode="numeric" name="notice_date"></label>
+          <label class="field"><span>ใบสั่งงาน เลขที่</span><input type="number" name="work_order_no"></label>
+        </div>
+        <div class="field-grid customer-row row-two">
+          <label class="field"><span>ชื่อเครื่องจักร</span><input type="text" name="machine_name"></label>
+          <label class="field"><span>ลักษณะการใช้งาน</span><input type="text" name="usage"></label>
+        </div>
+        <div class="field-grid customer-row row-three">
+          <label class="field"><span>ID เครื่อง</span><input type="text" name="machine_id"></label>
+          <label class="field"><span>รุ่น / ยี่ห้อ</span><input type="text" name="model_brand"></label>
+          <label class="field"><span>Serial No</span><input type="text" name="serial_no"></label>
+        </div>
+        <div class="field-grid customer-row row-four">
+          <label class="field"><span>PLANT</span><input type="text" name="plant"></label>
+          <label class="field"><span>Cost Center</span><input type="number" name="cost_center"></label>
+          <label class="field"><span>ผู้ติดต่อประสานงาน</span><input type="text" name="contact"></label>
+          <label class="field"><span>เบอร์โทร</span><input type="tel" name="phone"></label>
+        </div>
+        <div class="field-grid customer-row row-five">
+          <label class="field"><span>อาการเสียเบื้องต้น</span><input type="text" name="initial_problem"></label>
+          <label class="field"><span>กำหนดแล้วเสร็จ</span><input type="text" inputmode="numeric" name="due_date"></label>
+        </div>
+      </section>
+
+      <section class="form-section overhaul-section">
+        <h2 class="section-title">หน่วยงานรับ Overhaul</h2>
+        <div class="overhaul-grid">
+          <section class="overhaul-column cause-column">
+            <h3>ตรวจเช็คสาเหตุ</h3>
+            <input class="cause-input" type="text" name="cause" aria-label="ตรวจเช็คสาเหตุ">
+            <input class="cause-input" type="text" name="cause" aria-label="ตรวจเช็คสาเหตุ">
+            <input class="cause-input" type="text" name="cause" aria-label="ตรวจเช็คสาเหตุ">
+            <input class="cause-input" type="text" name="cause" aria-label="ตรวจเช็คสาเหตุ">
+            <label class="line-field"><span>ลงชื่อผู้ตรวจเช็ค</span><input type="text" name="inspector_signature"></label>
+          </section>
+          <section class="overhaul-column staff-column">
+            <h3>ผู้รับผิดชอบ / ช่างผู้ปฏิบัติงาน</h3>
+            <label class="line-field"><span>หัวหน้างาน</span><input type="text" name="supervisor"></label>
+            <label class="numbered-line"><span>1.</span><input type="text" name="worker_1"></label>
+            <label class="numbered-line"><span>2.</span><input type="text" name="worker_2"></label>
+            <label class="numbered-line"><span>3.</span><input type="text" name="worker_3"></label>
+          </section>
+          <section class="overhaul-column duration-column">
+            <h3>ระยะเวลาการทำงาน</h3>
+            <label class="line-field"><span>วันที่เริ่ม</span><input type="text" inputmode="numeric" name="start_date"></label>
+            <label class="line-field"><span>วันที่แล้วเสร็จ</span><input type="text" inputmode="numeric" name="finish_date"></label>
+            <label class="line-field total-days"><span>รวม</span><input type="number" name="total_days" min="0" readonly><b>วัน</b></label>
+          </section>
+        </div>
+      </section>
+
+      <section class="parts-section" aria-label="รายการอะไหล่หน้าแรก">
+        <table class="parts-table">
+          <thead>
+            <tr>
+              <th>ลำดับ</th><th>รายการ / รุ่น / ยี่ห้อ</th><th>Cleaning</th><th>จำนวน</th>
+              <th>หน่วย</th><th>ราคา / หน่วย</th><th>จำนวนเงิน</th><th>เลขที่เอกสารอ้างอิง</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><input aria-label="ลำดับ 1"></td><td><input aria-label="รายการ 1"></td><td><input aria-label="Cleaning 1"></td><td><input aria-label="จำนวน 1"></td><td><input aria-label="หน่วย 1"></td><td><input aria-label="ราคาต่อหน่วย 1"></td><td><input aria-label="จำนวนเงิน 1"></td><td><input aria-label="เอกสารอ้างอิง 1"></td></tr>
+            <tr><td><input aria-label="ลำดับ 2"></td><td><input aria-label="รายการ 2"></td><td><input aria-label="Cleaning 2"></td><td><input aria-label="จำนวน 2"></td><td><input aria-label="หน่วย 2"></td><td><input aria-label="ราคาต่อหน่วย 2"></td><td><input aria-label="จำนวนเงิน 2"></td><td><input aria-label="เอกสารอ้างอิง 2"></td></tr>
+            <tr><td><input aria-label="ลำดับ 3"></td><td><input aria-label="รายการ 3"></td><td><input aria-label="Cleaning 3"></td><td><input aria-label="จำนวน 3"></td><td><input aria-label="หน่วย 3"></td><td><input aria-label="ราคาต่อหน่วย 3"></td><td><input aria-label="จำนวนเงิน 3"></td><td><input aria-label="เอกสารอ้างอิง 3"></td></tr>
+            <tr><td><input aria-label="ลำดับ 4"></td><td><input aria-label="รายการ 4"></td><td><input aria-label="Cleaning 4"></td><td><input aria-label="จำนวน 4"></td><td><input aria-label="หน่วย 4"></td><td><input aria-label="ราคาต่อหน่วย 4"></td><td><input aria-label="จำนวนเงิน 4"></td><td><input aria-label="เอกสารอ้างอิง 4"></td></tr>
+            <tr><td><input aria-label="ลำดับ 5"></td><td><input aria-label="รายการ 5"></td><td><input aria-label="Cleaning 5"></td><td><input aria-label="จำนวน 5"></td><td><input aria-label="หน่วย 5"></td><td><input aria-label="ราคาต่อหน่วย 5"></td><td><input aria-label="จำนวนเงิน 5"></td><td><input aria-label="เอกสารอ้างอิง 5"></td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <footer class="page-footer"><span>ใบบันทึกการเปลี่ยนอะไหล่เครื่องจักร</span><strong>หน้า 1 / 4</strong></footer>
+    </section>
+
+    <section class="page page-final" aria-label="หน้าที่ 4">
+      <p class="note"><strong>หมายเหตุ:</strong> ตรวจสอบเครื่องจักรและทดสอบการทำงานก่อนส่งมอบ</p>
+
+      <section class="parts-section final-parts" aria-label="รายการอะไหล่หน้าสุดท้าย">
+        <table class="parts-table">
+          <thead>
+            <tr>
+              <th>ลำดับ</th><th>รายการ / รุ่น / ยี่ห้อ</th><th>Cleaning</th><th>จำนวน</th>
+              <th>หน่วย</th><th>ราคา / หน่วย</th><th>จำนวนเงิน</th><th>เลขที่เอกสารอ้างอิง</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><input aria-label="ลำดับ 6"></td><td><input aria-label="รายการ 6"></td><td><input aria-label="Cleaning 6"></td><td><input aria-label="จำนวน 6"></td><td><input aria-label="หน่วย 6"></td><td><input aria-label="ราคาต่อหน่วย 6"></td><td><input aria-label="จำนวนเงิน 6"></td><td><input aria-label="เอกสารอ้างอิง 6"></td></tr>
+            <tr><td><input aria-label="ลำดับ 7"></td><td><input aria-label="รายการ 7"></td><td><input aria-label="Cleaning 7"></td><td><input aria-label="จำนวน 7"></td><td><input aria-label="หน่วย 7"></td><td><input aria-label="ราคาต่อหน่วย 7"></td><td><input aria-label="จำนวนเงิน 7"></td><td><input aria-label="เอกสารอ้างอิง 7"></td></tr>
+            <tr><td><input aria-label="ลำดับ 8"></td><td><input aria-label="รายการ 8"></td><td><input aria-label="Cleaning 8"></td><td><input aria-label="จำนวน 8"></td><td><input aria-label="หน่วย 8"></td><td><input aria-label="ราคาต่อหน่วย 8"></td><td><input aria-label="จำนวนเงิน 8"></td><td><input aria-label="เอกสารอ้างอิง 8"></td></tr>
+            <tr><td><input aria-label="ลำดับ 9"></td><td><input aria-label="รายการ 9"></td><td><input aria-label="Cleaning 9"></td><td><input aria-label="จำนวน 9"></td><td><input aria-label="หน่วย 9"></td><td><input aria-label="ราคาต่อหน่วย 9"></td><td><input aria-label="จำนวนเงิน 9"></td><td><input aria-label="เอกสารอ้างอิง 9"></td></tr>
+            <tr><td><input aria-label="ลำดับ 10"></td><td><input aria-label="รายการ 10"></td><td><input aria-label="Cleaning 10"></td><td><input aria-label="จำนวน 10"></td><td><input aria-label="หน่วย 10"></td><td><input aria-label="ราคาต่อหน่วย 10"></td><td><input aria-label="จำนวนเงิน 10"></td><td><input aria-label="เอกสารอ้างอิง 10"></td></tr>
+            <tr><td><input aria-label="ลำดับ 11"></td><td><input aria-label="รายการ 11"></td><td><input aria-label="Cleaning 11"></td><td><input aria-label="จำนวน 11"></td><td><input aria-label="หน่วย 11"></td><td><input aria-label="ราคาต่อหน่วย 11"></td><td><input aria-label="จำนวนเงิน 11"></td><td><input aria-label="เอกสารอ้างอิง 11"></td></tr>
+            <tr><td><input aria-label="ลำดับ 12"></td><td><input aria-label="รายการ 12"></td><td><input aria-label="Cleaning 12"></td><td><input aria-label="จำนวน 12"></td><td><input aria-label="หน่วย 12"></td><td><input aria-label="ราคาต่อหน่วย 12"></td><td><input aria-label="จำนวนเงิน 12"></td><td><input aria-label="เอกสารอ้างอิง 12"></td></tr>
+            <tr><td><input aria-label="ลำดับ 13"></td><td><input aria-label="รายการ 13"></td><td><input aria-label="Cleaning 13"></td><td><input aria-label="จำนวน 13"></td><td><input aria-label="หน่วย 13"></td><td><input aria-label="ราคาต่อหน่วย 13"></td><td><input aria-label="จำนวนเงิน 13"></td><td><input aria-label="เอกสารอ้างอิง 13"></td></tr>
+            <tr><td><input aria-label="ลำดับ 14"></td><td><input aria-label="รายการ 14"></td><td><input aria-label="Cleaning 14"></td><td><input aria-label="จำนวน 14"></td><td><input aria-label="หน่วย 14"></td><td><input aria-label="ราคาต่อหน่วย 14"></td><td><input aria-label="จำนวนเงิน 14"></td><td><input aria-label="เอกสารอ้างอิง 14"></td></tr>
+            <tr><td><input aria-label="ลำดับ 15"></td><td><input aria-label="รายการ 15"></td><td><input aria-label="Cleaning 15"></td><td><input aria-label="จำนวน 15"></td><td><input aria-label="หน่วย 15"></td><td><input aria-label="ราคาต่อหน่วย 15"></td><td><input aria-label="จำนวนเงิน 15"></td><td><input aria-label="เอกสารอ้างอิง 15"></td></tr>
+          </tbody>
+          <tfoot>
+            <tr><th colspan="6">รวมทั้งหมด (บาท)</th><td><input aria-label="รวมทั้งหมด"></td><td></td></tr>
+          </tfoot>
+        </table>
+      </section>
+
+      <section class="summary-grid">
+        <section class="summary-column result-column">
+          <h2>สรุปผลการ Overhaul</h2>
+          <label class="check-field"><input type="checkbox" name="result" value="early"><span>เสร็จก่อนแผนงาน</span></label>
+          <label class="check-field"><input type="checkbox" name="result" value="on_time"><span>อยู่ในแผนงาน</span></label>
+          <label class="check-field"><input type="checkbox" name="result" value="late"><span>เสร็จล่าช้าแผนงาน</span></label>
+          <label class="line-field reason-field"><span>สาเหตุ</span><input type="text" name="result_reason"></label>
+          <input class="standalone-line" type="text" name="result_reason_more" aria-label="สาเหตุเพิ่มเติม">
+        </section>
+
+        <section class="summary-column handover-column">
+          <h2>ส่งมอบงาน</h2>
+          <div class="signature-block">
+            <label class="line-field"><span>ลงชื่อ</span><input type="text" name="handover_signature"><b>หัวหน้างาน / เจ้าหน้าที่</b></label>
+            <label class="line-field"><span>วันที่</span><input type="text" inputmode="numeric" name="handover_date"></label>
+          </div>
+          <div class="signature-block approval-block">
+            <h3>ผู้อนุมัติ</h3>
+            <label class="line-field"><span>ลงชื่อ</span><input type="text" name="approval_signature"><b>แผนก / ฝ่าย</b></label>
+            <label class="line-field"><span>วันที่</span><input type="text" inputmode="numeric" name="approval_date"></label>
+          </div>
+        </section>
+
+        <section class="summary-column customer-acceptance">
+          <h2>ส่วนลูกค้า - ตรวจรับส่งมอบเครื่องจักร</h2>
+          <label class="check-field"><input type="checkbox" name="acceptance" value="pass"><span>ผ่าน</span></label>
+          <div class="accept-row">
+            <label class="check-field"><input type="checkbox" name="acceptance" value="fail"><span>ไม่ผ่าน</span></label>
+            <label class="line-field"><span>เนื่องจาก</span><input type="text" name="rejection_reason"></label>
+          </div>
+          <input class="standalone-line" type="text" name="rejection_reason_more" aria-label="เหตุผลเพิ่มเติม">
+          <label class="line-field customer-sign"><span>ลงชื่อ</span><input type="text" name="customer_signature"><b>เจ้าหน้าที่ / แผนก</b></label>
+          <label class="line-field"><span>วันที่</span><input type="text" inputmode="numeric" name="customer_date" ></label>
+        </section>
+      </section>
+
+      <footer class="page-footer"><span>ใบบันทึกการเปลี่ยนอะไหล่เครื่องจักร</span><strong>หน้า 4 / 4</strong></footer>
+    </section>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="script.js"></script>
+</body>
+</html>
