@@ -630,9 +630,57 @@ document.querySelector('#save-file').addEventListener('click', () => {
   URL.revokeObjectURL(link.href);
 });
 
-document.querySelector('#export-pdf').addEventListener('click', () => {
-  showCsvStatus('เตรียมพิมพ์เป็น PDF แล้ว กรุณาเลือก Save as PDF ในหน้าต่างพิมพ์', 'warning');
-  window.print();
+document.querySelector('#export-pdf').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  const originalText = button.textContent;
+
+  if (!window.html2canvas || !window.jspdf?.jsPDF) {
+    showCsvStatus('โหลดระบบสร้าง PDF ไม่สำเร็จ กำลังเปิดหน้าต่างพิมพ์แทน', 'warning');
+    window.print();
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = 'กำลังสร้าง PDF...';
+  showCsvStatus('กำลังสร้างไฟล์ PDF กรุณารอสักครู่', 'warning');
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'in', format: 'letter' });
+    const pages = [...document.querySelectorAll('.page')];
+
+    for (let index = 0; index < pages.length; index += 1) {
+      const canvas = await window.html2canvas(pages[index], {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        useCORS: true,
+        logging: false,
+        onclone: (clonedDocument) => {
+          clonedDocument.querySelectorAll('.page').forEach((page) => {
+            page.style.boxShadow = 'none';
+          });
+        }
+      });
+
+      if (index > 0) {
+        pdf.addPage('letter', 'landscape');
+      }
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, 11, 8.5, undefined, 'FAST');
+    }
+
+    const machineId = document.querySelector('[name="machine_id"]')?.value.trim() || 'ไม่ระบุ';
+    const repairNotice = document.querySelector('[name="repair_notice_no"]')?.value.trim() || 'ไม่ระบุ';
+    const safeFilePart = (value) => value.replace(/[<>:"/\\|?*]/g, '-');
+    const fileName = safeFilePart(`ใบบันทึกการเปลี่ยนอะไหล่ ${machineId} ${repairNotice}.pdf`);
+    pdf.save(fileName);
+    showCsvStatus('สร้างและดาวน์โหลดไฟล์ PDF สำเร็จ', 'success');
+  } catch (error) {
+    showCsvStatus(`สร้าง PDF ไม่สำเร็จ: ${error.message} กำลังเปิดหน้าต่างพิมพ์แทน`, 'warning');
+    window.print();
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText;
+  }
 });
 
 savedFileInput.addEventListener('change', async (event) => {
