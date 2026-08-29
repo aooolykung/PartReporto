@@ -68,17 +68,22 @@ updateTotalDays();
 updateResultStatus();
 
 const partTables = [...document.querySelectorAll('.parts-table')];
-const partGroups = partTables.map((table, index) => ({
-  name: `parts-${index}`,
-  sourceTable: table,
-  sourcePage: table.closest('.page'),
-  summary: table.closest('.page').querySelector('.summary-grid'),
-  sourceTbody: table.querySelector('tbody'),
-  totalFooter: table.querySelector('tfoot'),
-  initialRows: table.querySelectorAll('tbody tr').length,
-  pageCapacity: index === 1 ? 15 : table.querySelectorAll('tbody tr').length,
-  continuationPages: []
-}));
+const partGroups = partTables.map((table, index) => {
+  const hasSummary = Boolean(table.closest('.page')?.querySelector('.summary-grid'));
+  const sourcePage = table.closest('.page');
+  const isFirstPage = sourcePage.classList.contains('page-one');
+  return {
+    name: `parts-${index}`,
+    sourceTable: table,
+    sourcePage: sourcePage,
+    summary: sourcePage.querySelector('.summary-grid'),
+    sourceTbody: table.querySelector('tbody'),
+    totalFooter: table.querySelector('tfoot'),
+    initialRows: table.querySelectorAll('tbody tr').length,
+    pageCapacity: hasSummary ? 20 : (isFirstPage ? 10 : 30),
+    continuationPages: []
+  };
+});
 
 partGroups.forEach((group) => {
   group.sourceTable.dataset.partsGroup = group.name;
@@ -191,6 +196,25 @@ function rebalanceGroup(group) {
     bodies[bodyIndex].append(row);
   });
 
+  const totalPages = Math.max(1, requiredPages + 1);
+  const pageTargets = Array.from({ length: totalPages }, (_, index) => {
+    const isLastPage = index === totalPages - 1;
+    const remainingRows = rows.length - (index * pageCapacity);
+    // Only pad pages if there's a summary grid (summary pages need exact row counts)
+    if (group.summary && rows.length <= pageCapacity) {
+      return pageCapacity;
+    }
+    return Math.max(0, Math.min(pageCapacity, remainingRows));
+  });
+
+  bodies.forEach((tbody, index) => {
+    const targetCount = pageTargets[index] ?? 0;
+    const currentCount = tbody.querySelectorAll('tr').length;
+    for (let offset = currentCount; offset < targetCount; offset += 1) {
+      tbody.append(createBlankRow(group.sourceTable, group.name));
+    }
+  });
+
   while (group.continuationPages.length > requiredPages) {
     const page = group.continuationPages.pop();
     if (group.totalFooter && page.contains(group.totalFooter)) {
@@ -264,7 +288,7 @@ function populateImportedParts(parts) {
     }
 
     const inputs = row.querySelectorAll('input');
-    inputs[1].value = `${materialNumber} ${description}`;
+    inputs[1].value = combinePartDescription(materialNumber, description);
     inputs[3].value = amount;
     inputs[4].value = unit;
     inputs[5].value = price;
@@ -309,6 +333,29 @@ function populateSavedParts(parts) {
   });
 }
 
+function normalizeCsvCell(value) {
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  return String(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9ก-ฮ]/g, '')
+    .trim();
+}
+
+function showCsvStatus(message, type = 'warning') {
+  const status = document.querySelector('#csv-status');
+  if (!status) {
+    return;
+  }
+
+  status.textContent = message;
+  status.className = `csv-status ${type}`;
+}
+
 function parseCsv(text) {
   const rows = [];
   let row = [];
@@ -349,6 +396,77 @@ function parseCsv(text) {
   return rows;
 }
 
+function matchCsvColumnIndex(headers, aliases) {
+  const normalizedHeaders = headers.map((header) => normalizeCsvCell(header));
+
+  for (let index = 0; index < normalizedHeaders.length; index += 1) {
+    const normalizedHeader = normalizedHeaders[index];
+    if (aliases.some((alias) => normalizedHeader === normalizeCsvCell(alias))) {
+      return index;
+    }
+  }
+
+  return null;
+}
+
+function parseCsvNumber(value) {
+  if (value === null || value === undefined || value === '') {
+    return 0;
+  }
+
+  const parsed = Number.parseFloat(String(value).replace(/,/g, '').replace(/[^0-9.-]/g, ''));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function getCsvRowPart(row, columnMap) {
+  const materialNumber = row[columnMap.materialNumber] ?? row[columnMap.description] ?? '';
+  const description = row[columnMap.description] ?? row[columnMap.materialNumber] ?? '';
+  const amount = row[columnMap.amount] ?? '0';
+  const unit = row[columnMap.unit] ?? '';
+  const price = row[columnMap.price] ?? '0';
+  const documentNumber = row[columnMap.documentNumber] ?? '';
+
+  return [
+    String(materialNumber).trim(),
+    String(description).trim(),
+    parseCsvNumber(amount),
+    String(unit).trim(),
+    parseCsvNumber(price),
+    String(documentNumber).trim()
+  ];
+}
+
+function combinePartDescription(materialNumber, description) {
+  const materialText = String(materialNumber || '').trim();
+  const descriptionText = String(description || '').trim();
+
+  if (!materialText) {
+    return descriptionText;
+  }
+  if (!descriptionText) {
+    return materialText;
+  }
+
+  const normalizeForComparison = (value) => value
+    .toLocaleLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+  const normalizedMaterial = normalizeForComparison(materialText);
+  const normalizedDescription = normalizeForComparison(descriptionText);
+
+  if (normalizedMaterial === normalizedDescription) {
+    return descriptionText;
+  }
+  if (normalizedDescription.includes(normalizedMaterial)) {
+    return descriptionText;
+  }
+  if (normalizedMaterial.includes(normalizedDescription)) {
+    return materialText;
+  }
+
+  return `${materialText} ${descriptionText}`;
+}
+
 function resetPartsTable() {
   partGroups.slice(1).forEach((group) => {
     group.continuationPages.forEach((page) => {
@@ -373,23 +491,102 @@ function resetPartsTable() {
   });
 }
 
-document.querySelector('#csv-file').addEventListener('change', async (event) => {
+const csvFileInput = document.querySelector('#csv-file');
+const savedFileInput = document.querySelector('#saved-file');
+
+// Clear the remembered path before opening the picker. Without this, choosing
+// the same file again does not fire a change event in most browsers.
+[csvFileInput, savedFileInput].forEach((fileInput) => {
+  fileInput?.addEventListener('click', () => {
+    fileInput.value = '';
+  });
+});
+
+csvFileInput.addEventListener('change', async (event) => {
   const file = event.target.files[0];
   if (!file) {
     return;
   }
 
-  const rows = parseCsv(await file.text());
+  let csvText;
+  try {
+    csvText = await file.text();
+  } catch (error) {
+    showCsvStatus(`ไม่สามารถอ่านไฟล์ CSV ได้: ${error.message}`, 'warning');
+    event.target.value = '';
+    return;
+  }
+
+  const rows = parseCsv(csvText);
+  if (!rows.length) {
+    showCsvStatus('ไฟล์ CSV ไม่มีข้อมูลที่สามารถนำเข้าได้', 'warning');
+    event.target.value = '';
+    return;
+  }
+
+  const headerAliases = {
+    materialNumber: ['materialnumber', 'materialnum', 'materialno', 'materialid', 'itemcode', 'itemno', 'รหัสวัสดุ', 'เลขวัสดุ', 'material'],
+    description: ['description', 'material_des', 'materialdes', 'material desc', 'itemdescription', 'itemname', 'รายละเอียด', 'รายการ', 'ชื่อวัสดุ', 'descriptionth'],
+    amount: ['amount', 'qty', 'quantity', 'จำนวน', 'qty1'],
+    unit: ['unit', 'units', 'หน่วย'],
+    price: ['price', 'unitprice', 'priceperunit', 'ราคาต่อหน่วย', 'ราคา', 'unitcost'],
+    documentNumber: ['documentnumber', 'docnumber', 'documentno', 'docno', 'เลขที่เอกสาร', 'เอกสารอ้างอิง', 'reference', 'refdoc']
+  };
+
+  const headerRow = rows[0];
+  const columnMap = Object.fromEntries(
+    Object.entries(headerAliases).map(([key, aliases]) => [key, matchCsvColumnIndex(headerRow, aliases)])
+  );
+
+  const materialNumberMissing = columnMap.materialNumber === null && columnMap.description === null;
+  const missingRequiredColumns = Object.entries(columnMap)
+    .filter(([key, index]) => ['description', 'amount', 'unit', 'price'].includes(key) && index === null)
+    .map(([key]) => key);
+
+  if (materialNumberMissing) {
+    missingRequiredColumns.push('materialNumber');
+  }
+
+  const hasNamedColumns = Object.values(columnMap).some((index) => index !== null);
+
   const parts = rows.slice(1)
-    .filter((row) => row.length >= 6 && row.some((cell) => cell !== ''))
-    .map(([materialNumber, description, amount, unit, price, documentNumber]) => [
-      materialNumber,
-      description,
-      Number.parseFloat(amount.replace(/,/g, '')) || 0,
-      unit,
-      Number.parseFloat(price.replace(/,/g, '')) || 0,
-      documentNumber
-    ]);
+    .filter((row) => row.some((cell) => String(cell).trim() !== ''))
+    .map((row) => {
+      if (hasNamedColumns) {
+        const mappedRow = getCsvRowPart(row, columnMap);
+        return mappedRow;
+      }
+
+      const fallback = row.slice(0, 6);
+      if (fallback.length < 6) {
+        return [fallback[0] || '', fallback[1] || '', 0, fallback[2] || '', 0, fallback[3] || ''];
+      }
+
+      return [
+        fallback[0] || '',
+        fallback[1] || '',
+        parseCsvNumber(fallback[2]),
+        fallback[3] || '',
+        parseCsvNumber(fallback[4]),
+        fallback[5] || ''
+      ];
+    });
+
+  if (missingRequiredColumns.length > 0) {
+    showCsvStatus(
+      `คำเตือน: คอลัมน์ที่จำเป็นหายไป ${missingRequiredColumns.map((name) => {
+        if (name === 'materialNumber') return 'materialNumber';
+        if (name === 'description') return 'description';
+        if (name === 'amount') return 'amount';
+        if (name === 'unit') return 'unit';
+        if (name === 'price') return 'price';
+        return name;
+      }).join(', ')} ระบบจะใช้ค่าเริ่มต้นแทนและอาจส่งผลต่อข้อมูลที่ import ได้`,
+      'warning'
+    );
+  } else {
+    showCsvStatus(`อัปโหลด CSV สำเร็จ: นำเข้าข้อมูล ${parts.length} รายการ`, 'success');
+  }
 
   resetPartsTable();
   parts.forEach((part, index) => {
@@ -401,6 +598,7 @@ document.querySelector('#csv-file').addEventListener('change', async (event) => 
   });
   populateImportedParts(parts);
   partGroups.forEach((group) => rebalanceGroup(group));
+  event.target.value = '';
 });
 
 document.querySelector('#save-file').addEventListener('click', () => {
@@ -432,13 +630,26 @@ document.querySelector('#save-file').addEventListener('click', () => {
   URL.revokeObjectURL(link.href);
 });
 
-document.querySelector('#saved-file').addEventListener('change', async (event) => {
+document.querySelector('#export-pdf').addEventListener('click', () => {
+  showCsvStatus('เตรียมพิมพ์เป็น PDF แล้ว กรุณาเลือก Save as PDF ในหน้าต่างพิมพ์', 'warning');
+  window.print();
+});
+
+savedFileInput.addEventListener('change', async (event) => {
   const file = event.target.files[0];
   if (!file) {
     return;
   }
 
-  const savedData = JSON.parse(await file.text());
+  let savedData;
+  try {
+    savedData = JSON.parse(await file.text());
+  } catch (error) {
+    showCsvStatus(`ไม่สามารถเปิดไฟล์บันทึกได้: ${error.message}`, 'warning');
+    event.target.value = '';
+    return;
+  }
+
   resetPartsTable();
   document.querySelectorAll('input[name], textarea[name]').forEach((input) => {
     const savedField = savedData.fields?.find((field) => field.name === input.name);
@@ -452,6 +663,10 @@ document.querySelector('#saved-file').addEventListener('change', async (event) =
   });
   populateSavedParts(savedData.parts || []);
   partGroups.forEach((group) => rebalanceGroup(group));
+  // A CSV selected before opening the saved form must be selectable again,
+  // even when it is the exact same file.
+  csvFileInput.value = '';
+  showCsvStatus(`เปิดไฟล์บันทึกสำเร็จ: ${file.name}`, 'success');
   event.target.value = '';
 });
 

@@ -14,11 +14,13 @@
       <input type="file" id="csv-file" accept=".csv,text/csv">
     </label>
     <button type="button" id="save-file">บันทึกไฟล์</button>
+    <button type="button" id="export-pdf">Export เป็น PDF</button>
     <label class="csv-upload">
       เปิดไฟล์บันทึก
       <input type="file" id="saved-file" accept=".json,application/json">
     </label>
   </div>
+  <div id="csv-status" class="csv-status" aria-live="polite"></div>
   <main class="document">
     <section class="page page-one" aria-label="หน้าที่ 1">
       <header class="page-title">

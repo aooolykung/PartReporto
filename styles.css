@@ -14,7 +14,9 @@
 .csv-toolbar {
   display: flex;
   justify-content: center;
+  gap: 8px;
   padding: 16px 16px 0;
+  flex-wrap: wrap;
 }
 
 .csv-upload {
@@ -38,6 +40,33 @@
 
 .csv-upload input { display: none; }
 
+.csv-status {
+  display: none;
+  max-width: 980px;
+  margin: 12px auto 0;
+  padding: 10px 14px;
+  border: 1px solid #c7c7c7;
+  border-radius: 6px;
+  background: #f3f4f6;
+  color: #1f2937;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.csv-status.warning {
+  display: block;
+  border-color: #d97706;
+  background: #fff7ed;
+  color: #9a4d00;
+}
+
+.csv-status.success {
+  display: block;
+  border-color: #16a34a;
+  background: #f0fdf4;
+  color: #166534;
+}
+
 html { background: #d8dadd; }
 
 body {
@@ -59,7 +88,7 @@ body {
   position: relative;
   width: var(--page-width);
   height: var(--page-height);
-  padding: 0.49in 0.54in 0.43in;
+  padding: 0.34in 0.46in 0.21in;
   overflow: hidden;
   background: var(--paper);
   box-shadow: 0 3px 18px rgb(0 0 0 / 16%);
@@ -132,6 +161,26 @@ h2, h3, p { margin: 0; }
   white-space: nowrap;
 }
 
+.field > span,
+.section-title,
+.summary-column > h2,
+.overhaul-column > h3,
+.page-title h1,
+.parts-table thead th,
+.parts-table tfoot th,
+.note strong,
+.summary-column > h2,
+.check-field span,
+.line-field span,
+.line-field b,
+.numbered-line span,
+.customer-sign b,
+.approval-block h3,
+.page-footer,
+.page-footer strong {
+  font-weight: 700;
+}
+
 input,
 textarea {
   min-width: 0;
@@ -141,7 +190,7 @@ textarea {
   outline: 0;
   background: transparent;
   color: var(--ink);
-  font: inherit;
+  font: normal 10px/1.25 Tahoma, "Noto Sans Thai", Arial, sans-serif;
 }
 
 
@@ -150,6 +199,7 @@ textarea:focus { background: #fffde8; }
 
 input[name$="_date"] { text-align: center; }
 input[name="total_days"] { text-align: center; }
+input[name="plant"] { text-align: center; }
 
 .overhaul-section { margin-top: 14px; }
 
@@ -211,11 +261,11 @@ input[name="total_days"] { text-align: center; }
 .duration-column .total-days { position: absolute; right: 10px; bottom: 8px; left: 10px; }
 .total-days b { margin-left: 2px; }
 
-.parts-section { margin-top: 16px; }
+.parts-section { margin-top: 10px; }
 .parts-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .parts-table th, .parts-table td { border: 1px solid var(--rule); }
-.parts-table thead th { height: 29px; padding: 2px 4px; background: var(--section); font-size: 10px; }
-.parts-table tbody td { height: 25px; }
+.parts-table thead th { height: 22px; padding: 2px 4px; background: var(--section); font-size: 10px; }
+.parts-table tbody td { height: 20px; }
 .parts-table input { height: 100%; padding: 2px 4px; text-align: center; }
 .parts-table td:nth-child(2) input,
 .parts-table td:last-child input { text-align: left; }
@@ -228,11 +278,11 @@ input[name="total_days"] { text-align: center; }
 .parts-table th:nth-child(7) { width: 9%; }
 .parts-table th:nth-child(8) { width: 17%; }
 
-.page-final { padding-top: 0.5in; }
+.page-final { padding-top: 0.38in; }
 .page-final .parts-section { margin-top: 0; }
-.page-final .parts-table tbody td { height: 27px; }
+.page-final .parts-table tbody td { height: 20px; }
 .parts-table tfoot th,
-.parts-table tfoot td { height: 31px; font-size: 11px; }
+.parts-table tfoot td { height: 24px; font-size: 11px; }
 .parts-table tfoot th { padding-right: 10px; text-align: right; }
 
 .note {
@@ -318,12 +368,12 @@ input[name="total_days"] { text-align: center; }
 
 .page-footer {
   position: absolute;
-  right: 0.54in;
-  bottom: 0.16in;
-  left: 0.54in;
+  right: 0.46in;
+  bottom: 0.12in;
+  left: 0.46in;
   display: flex;
   justify-content: space-between;
-  padding-top: 7px;
+  padding-top: 6px;
   border-top: 1px solid var(--section);
   color: var(--muted);
   font-size: 9px;
@@ -341,6 +391,7 @@ input[name="total_days"] { text-align: center; }
 
 @media print {
   .csv-toolbar { display: none; }
+  #csv-status { display: none !important; }
   @page { size: letter landscape; margin: 0; }
   html, body { background: #fff; }
   .document { display: block; padding: 0; }
