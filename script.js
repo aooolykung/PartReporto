@@ -80,7 +80,7 @@ const partGroups = partTables.map((table, index) => {
     sourceTbody: table.querySelector('tbody'),
     totalFooter: table.querySelector('tfoot'),
     initialRows: table.querySelectorAll('tbody tr').length,
-    pageCapacity: hasSummary ? 20 : (isFirstPage ? 10 : 30),
+    pageCapacity: hasSummary ? 10 : (isFirstPage ? 10 : 30),
     continuationPages: []
   };
 });
@@ -291,8 +291,8 @@ function populateImportedParts(parts) {
     inputs[1].value = combinePartDescription(materialNumber, description);
     inputs[3].value = amount;
     inputs[4].value = unit;
-    inputs[5].value = price;
-    inputs[6].value = amount * price;
+    inputs[5].value = amount > 0 ? price / amount : '';
+    inputs[6].value = price;
     inputs[7].value = documentNumber;
     row.dataset.hasContent = 'true';
   });
@@ -630,49 +630,182 @@ document.querySelector('#save-file').addEventListener('click', () => {
   URL.revokeObjectURL(link.href);
 });
 
+async function ensureThaiPdfFonts() {
+  const fontUrls = {
+    'NotoSansThai-Regular.ttf': 'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts/hinted/ttf/NotoSansThai/NotoSansThai-Regular.ttf',
+    'NotoSansThai-Bold.ttf': 'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts/hinted/ttf/NotoSansThai/NotoSansThai-Bold.ttf'
+  };
+  const entries = await Promise.all(Object.entries(fontUrls).map(async ([name, url]) => {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`โหลดฟอนต์ไม่สำเร็จ (${response.status})`);
+    }
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    let binary = '';
+    bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+    return [name, btoa(binary)];
+  }));
+  entries.forEach(([name, base64]) => { window.pdfMake.vfs[name] = base64; });
+  window.pdfMake.fonts = {
+    THSarabun: {
+      normal: 'NotoSansThai-Regular.ttf', bold: 'NotoSansThai-Bold.ttf',
+      italics: 'NotoSansThai-Regular.ttf', bolditalics: 'NotoSansThai-Bold.ttf'
+    },
+    Roboto: {
+      normal: 'Roboto-Regular.ttf', bold: 'Roboto-Medium.ttf',
+      italics: 'Roboto-Italic.ttf', bolditalics: 'Roboto-MediumItalic.ttf'
+    }
+  };
+}
+
 document.querySelector('#export-pdf').addEventListener('click', async (event) => {
   const button = event.currentTarget;
   const originalText = button.textContent;
 
-  if (!window.html2canvas || !window.jspdf?.jsPDF) {
-    showCsvStatus('โหลดระบบสร้าง PDF ไม่สำเร็จ กำลังเปิดหน้าต่างพิมพ์แทน', 'warning');
+  if (!window.pdfMake) {
+    showCsvStatus('โหลด pdfmake ไม่สำเร็จ กำลังเปิดหน้าต่างพิมพ์แทน', 'warning');
     window.print();
     return;
   }
 
   button.disabled = true;
   button.textContent = 'กำลังสร้าง PDF...';
-  showCsvStatus('กำลังสร้างไฟล์ PDF กรุณารอสักครู่', 'warning');
+  showCsvStatus('กำลังสร้างไฟล์ PDF ด้วย pdfmake กรุณารอสักครู่', 'warning');
 
   try {
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ orientation: 'landscape', unit: 'in', format: 'letter' });
-    const pages = [...document.querySelectorAll('.page')];
-
-    for (let index = 0; index < pages.length; index += 1) {
-      const canvas = await window.html2canvas(pages[index], {
-        scale: 2,
-        backgroundColor: '#ffffff',
-        useCORS: true,
-        logging: false,
-        onclone: (clonedDocument) => {
-          clonedDocument.querySelectorAll('.page').forEach((page) => {
-            page.style.boxShadow = 'none';
-          });
-        }
-      });
-
-      if (index > 0) {
-        pdf.addPage('letter', 'landscape');
+    await ensureThaiPdfFonts();
+    const fieldValue = (name) => document.querySelector(`[name="${name}"]`)?.value.trim() || '';
+    const fieldValues = (name) => [...document.querySelectorAll(`[name="${name}"]`)]
+      .map((input) => input.value.trim())
+      .filter(Boolean);
+    const totalAmount = () => document.querySelector('[aria-label="รวมทั้งหมด"]')?.value.trim() || '';
+    const checked = (name, value) => document.querySelector(`[name="${name}"][value="${value}"]`)?.checked ? 'X' : '';
+    const sourceRows = [...document.querySelectorAll('.parts-table tbody tr')]
+      .map((row) => [...row.querySelectorAll('input')].map((input) => input.value || ''));
+    const blank = ['', '', '', '', '', '', '', ''];
+    const enteredParts = sourceRows.filter((values) => values.slice(1).some((value) => String(value).trim() !== ''));
+    const middlePageCount = Math.max(0, Math.ceil(Math.max(0, enteredParts.length - 20) / 30));
+    const parts = Array.from({ length: 20 + middlePageCount * 30 }, (_, index) => enteredParts[index] || blank);
+    const headers = ['ลำดับ', 'รายการ / รุ่น / ยี่ห้อ', 'Cleaning', 'จำนวน', 'หน่วย', 'ราคา / หน่วย', 'จำนวนเงิน', 'เลขที่เอกสารอ้างอิง'];
+    const richText = (value) => String(value || '').split(/([\u0E00-\u0E7F]+)/).filter(Boolean).map((part) => ({
+      text: part,
+      font: /[\u0E00-\u0E7F]/.test(part) ? 'THSarabun' : 'Roboto'
+    }));
+    const text = (value, alignment = 'left', bold = false) => ({ text: richText(value), alignment, bold });
+    const checkboxLine = (name, value, label) => ({
+      columns: [
+        {
+          canvas: [
+            { type: 'rect', x: 0, y: 1, w: 13, h: 13, lineWidth: 1 },
+            ...(checked(name, value) ? [{ type: 'line', x1: 3, y1: 7, x2: 6, y2: 11, lineWidth: 1 }, { type: 'line', x1: 6, y1: 11, x2: 11, y2: 3, lineWidth: 1 }] : [])
+          ],
+          width: 17
+        },
+        text(label, 'left')
+      ],
+      columnGap: 5,
+      margin: [0, 3, 0, 3]
+    });
+    const line = (label, value) => ({
+      columns: [text(label, 'left', true), { text: richText(value || ' '), decoration: 'underline' }],
+      columnGap: 4,
+      margin: [0, 1, 0, 1]
+    });
+    const summaryLine = (label, value, suffix = '', lineWidth = 150) => ({
+      columns: [
+        { width: 42, ...text(label, 'left', true) },
+        {
+          width: lineWidth,
+          stack: [
+            { text: value ? richText(value) : ' ', 
+              fontSize: 8,
+              alignment: 'center', 
+              margin: [0, 0, 0, 1] 
+            },
+            { canvas: [{ type: 'line', x1: 0, y1: 0, x2: lineWidth, y2: 0, lineWidth: 0.7 }] }
+          ]
+        },
+        ...(suffix ? [{ width: 92, ...text(suffix, 'left', true) }] : [])
+      ],
+      columnGap: 4,
+      margin: [0, 10, 0, 3]
+    });
+    const workerLine = (label, value) => ({
+      columns: [
+      { width: 24, ...text(label, 'left', true) },
+      { text: richText(value || ' '), decoration: 'underline' }
+       ],
+      columnGap: 6,
+      margin: [0, 1, 0, 1]
+    });
+        const leaderLine = (label, value) => ({
+      columns: [
+      { width: 50, ...text(label, 'left', true) },
+      { text: richText(value || ' '), decoration: 'underline' }
+       ],
+      columnGap: 6,
+      margin: [0, 1, 0, 1]
+    });
+    const handoverLine = (label, value, suffix = '') => summaryLine(label, value, suffix, 150);
+    const partsTable = (start, count, total = false) => {
+      const body = [headers.map((header) => text(header, 'center', true))];
+      parts.slice(start, start + count).forEach((values, offset) => body.push([
+        text(start + offset + 1, 'center'), text(values[1]), text(values[2], 'center'), text(values[3], 'center'),
+        text(values[4], 'center'), text(values[5], 'right'), text(values[6], 'right'), text(values[7])
+      ]));
+      if (total) {
+        body.push([{ text: richText('รวมทั้งหมด (บาท)'), colSpan: 6, alignment: 'right', bold: true }, {}, {}, {}, {}, {}, text(totalAmount(), 'right'), '']);
       }
-      pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, 11, 8.5, undefined, 'FAST');
+      return { table: { headerRows: 1, widths: [30, '*', 45, 43, 38, 53, 58, 98], body }, layout: 'grid', fontSize: 8 };
+    };
+    const info = { table: { widths: ['*', '*', '*'], body: [
+      [{ text: richText('ข้อมูลลูกค้า'), colSpan: 3, alignment: 'center', bold: true }, {}, {}],
+      [line('ใบแจ้งซ่อม เลขที่', fieldValue('repair_notice_no')), line('วันที่', fieldValue('notice_date')), line('ใบสั่งงาน เลขที่', fieldValue('work_order_no'))],
+      [line('ชื่อเครื่องจักร', fieldValue('machine_name')), line('ลักษณะการใช้งาน', fieldValue('usage')), ''],
+      [line('ID เครื่อง', fieldValue('machine_id')), line('รุ่น / ยี่ห้อ', fieldValue('model_brand')), line('Serial No', fieldValue('serial_no'))],
+      [line('PLANT', fieldValue('plant')), line('Cost Center', fieldValue('cost_center')), line('ผู้ติดต่อ / เบอร์โทร', `${fieldValue('contact')} ${fieldValue('phone')}`)],
+      [{ text: richText(`อาการเสียเบื้องต้น: ${fieldValue('initial_problem')}`), colSpan: 2 }, {}, line('กำหนดแล้วเสร็จ', fieldValue('due_date'))]
+    ] }, layout: 'grid', margin: [0, 0, 0, 7] };
+    const overhaul = { table: { widths: ['30%', '42%', '28%'], body: [
+      [{ text: richText('ตรวจเช็คสาเหตุ'), alignment: 'center', bold: true }, { text: richText('ผู้รับผิดชอบ / ช่างผู้ปฏิบัติงาน'), alignment: 'center', bold: true }, { text: richText('ระยะเวลาการทำงาน'), alignment: 'center', bold: true }],
+      [text(fieldValues('cause').join('\n'), 'left'), 
+        { stack: [leaderLine('หัวหน้างาน', fieldValue('supervisor')),
+          workerLine('1.', fieldValue('worker_1')), 
+          workerLine('2.', fieldValue('worker_2')), 
+          workerLine('3.', fieldValue('worker_3'))] }, 
+          
+          { stack: [line('วันที่เริ่ม', fieldValue('start_date')), 
+            line('วันที่แล้วเสร็จ', fieldValue('finish_date')), 
+            line('รวม', `   ${fieldValue('total_days')}   วัน`)] }],
+      [line('ลงชื่อผู้ตรวจเช็ค', fieldValue('inspector_signature')), '', '']
+    ] }, layout: 'grid', margin: [0, 0, 0, 7] };
+    const summary = { table: { widths: ['30%', '35%', '35%'], heights: [15, 92, 15, 90], body: [
+      [{ text: richText('สรุปผลการ Overhaul'), alignment: 'center', bold: true }, { text: richText('ส่งมอบงาน'), alignment: 'center', bold: true }, { text: richText('ส่วนลูกค้า (ตรวจ/รับส่งมอบเครื่องจักร)'), alignment: 'center', bold: true }],
+      [{ stack: [checkboxLine('result', 'early', 'เสร็จก่อนแผนงาน'), checkboxLine('result', 'on_time', 'อยู่ในแผนงาน'), checkboxLine('result', 'late', 'เสร็จล่าช้าแผนงาน')] }, { stack: [summaryLine('ลงชื่อ :', fieldValue('handover_signature'), 'หัวหน้างาน / เจ้าหน้าที่'), summaryLine('วันที่ :', fieldValue('handover_date'))] }, { stack: [checkboxLine('acceptance', 'pass', 'ผ่าน'), checkboxLine('acceptance', 'fail', `ไม่ผ่าน เนื่องจาก : ${fieldValue('rejection_reason')}`)] }],
+      ['', { text: richText('ผู้อนุมัติ'), alignment: 'center', bold: true }, { text: '' }],
+      [{ stack: [summaryLine('สาเหตุ :', fieldValue('result_reason'), '',175), summaryLine('', fieldValue('result_reason_more'), '', 175), summaryLine('', fieldValue('result_reason_more'), '', 175)] }, { stack: [summaryLine('ลงชื่อ : ', fieldValue('approval_signature'), 'แผนก / ฝ่าย'), summaryLine('วันที่ :', fieldValue('approval_date'))] }, { stack: [summaryLine('ลงชื่อ :', fieldValue('customer_signature'), 'เจ้าหน้าที่ / แผนก'), summaryLine('วันที่ :', fieldValue('customer_date'))] }]
+    ] }, layout: 'grid', fontSize: 8 };
+    const page = (items) => [{ text: richText('ใบบันทึกการเปลี่ยนอะไหล่เครื่องจักร (Overhaul)'), style: 'header', alignment: 'center' }, ...items];
+    const content = [...page([info, overhaul, partsTable(0, 10)])];
+    let nextPart = 10;
+    for (let pageIndex = 0; pageIndex < middlePageCount; pageIndex += 1) {
+      content.push({ text: '', pageBreak: 'after' }, ...page([partsTable(nextPart, 30)]));
+      nextPart += 30;
     }
-
-    const machineId = document.querySelector('[name="machine_id"]')?.value.trim() || 'ไม่ระบุ';
-    const repairNotice = document.querySelector('[name="repair_notice_no"]')?.value.trim() || 'ไม่ระบุ';
+    content.push(
+      { text: '', pageBreak: 'after' },
+      ...page([{ text: richText('**ตรวจสอบเครื่องจักรและทดสอบก่อนส่งมอบ'), margin: [0, 0, 0, 5] }, partsTable(nextPart, parts.length - nextPart, true), summary])
+    );
+    const docDefinition = {
+      pageSize: 'A4', pageOrientation: 'landscape', pageMargins: [18, 18, 18, 18], content,
+      styles: { header: { fontSize: 16, bold: true, margin: [0, 0, 0, 7] } },
+      defaultStyle: { font: 'THSarabun', fontSize: 8 },
+      footer: (currentPage, pageCount) => ({ text: richText(`หน้า ${currentPage} / ${pageCount}`), alignment: 'right', margin: [0, 0, 18, 6], fontSize: 8 })
+    };
+    const machineId = fieldValue('machine_id') || 'ไม่ระบุ';
+    const repairNotice = fieldValue('repair_notice_no') || 'ไม่ระบุ';
     const safeFilePart = (value) => value.replace(/[<>:"/\\|?*]/g, '-');
-    const fileName = safeFilePart(`ใบบันทึกการเปลี่ยนอะไหล่ ${machineId} ${repairNotice}.pdf`);
-    pdf.save(fileName);
+    window.pdfMake.createPdf(docDefinition).download(safeFilePart(`ใบบันทึกการเปลี่ยนอะไหล่ ${machineId} ${repairNotice}.pdf`));
     showCsvStatus('สร้างและดาวน์โหลดไฟล์ PDF สำเร็จ', 'success');
   } catch (error) {
     showCsvStatus(`สร้าง PDF ไม่สำเร็จ: ${error.message} กำลังเปิดหน้าต่างพิมพ์แทน`, 'warning');
@@ -699,8 +832,19 @@ savedFileInput.addEventListener('change', async (event) => {
   }
 
   resetPartsTable();
+  const savedFieldsByName = (savedData.fields || []).reduce((fields, savedField) => {
+    if (!fields.has(savedField.name)) {
+      fields.set(savedField.name, []);
+    }
+    fields.get(savedField.name).push(savedField);
+    return fields;
+  }, new Map());
+  const fieldIndexes = new Map();
   document.querySelectorAll('input[name], textarea[name]').forEach((input) => {
-    const savedField = savedData.fields?.find((field) => field.name === input.name);
+    const savedFields = savedFieldsByName.get(input.name) || [];
+    const fieldIndex = fieldIndexes.get(input.name) || 0;
+    const savedField = savedFields[fieldIndex];
+    fieldIndexes.set(input.name, fieldIndex + 1);
     if (!savedField) {
       return;
     }
@@ -717,6 +861,15 @@ savedFileInput.addEventListener('change', async (event) => {
   showCsvStatus(`เปิดไฟล์บันทึกสำเร็จ: ${file.name}`, 'success');
   event.target.value = '';
 });
+
+const firstPageGroup = partGroups.find((group) => group.sourcePage.classList.contains('page-one'));
+const finalPageGroup = partGroups.find((group) => group.summary);
+while (firstPageGroup && firstPageGroup.sourceTbody.rows.length < 10) {
+  firstPageGroup.sourceTbody.append(createBlankRow(firstPageGroup.sourceTable, firstPageGroup.name));
+}
+while (finalPageGroup && finalPageGroup.sourceTbody.rows.length > 10) {
+  finalPageGroup.sourceTbody.lastElementChild.remove();
+}
 
 partGroups.forEach((group) => {
   rebalanceGroup(group);

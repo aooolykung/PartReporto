@@ -2,11 +2,11 @@
   --ink: #111;
   --muted: #333;
   --rule: #111;
-  --section: #e6e6e6;
-  --label: #f2f2f2;
+  --section: #fff;
+  --label: #fff;
   --paper: #fff;
-  --page-width: 11in;
-  --page-height: 8.5in;
+  --page-width: 11.69in;
+  --page-height: 8.27in;
 }
 
 * { box-sizing: border-box; }
@@ -72,39 +72,40 @@ html { background: #d8dadd; }
 body {
   margin: 0;
   color: var(--ink);
-  font-family: Tahoma, "Noto Sans Thai", Arial, sans-serif;
+  font-family: Arial, Tahoma, "Noto Sans Thai", sans-serif;
   font-size: 10px;
-  line-height: 1.25;
+  line-height: 1.2;
 }
 
 .document {
   display: grid;
-  gap: 28px;
+  gap: 20px;
   justify-content: center;
-  padding: 28px;
+  padding: 20px;
 }
 
 .page {
   position: relative;
   width: var(--page-width);
+  min-height: var(--page-height);
   height: var(--page-height);
-  padding: 0.34in 0.46in 0.21in;
+  padding: 0.25in 0.32in 0.18in;
   overflow: hidden;
   background: var(--paper);
   box-shadow: 0 3px 18px rgb(0 0 0 / 16%);
 }
 
 .page-title {
-  height: 0.5in;
+  height: 0.42in;
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding-top: 0.09in;
+  padding-top: 0.04in;
 }
 
 h1 {
   margin: 0;
-  font-size: 21px;
+  font-size: 19px;
   line-height: 1;
 }
 
@@ -118,7 +119,7 @@ h2, h3, p { margin: 0; }
   justify-content: center;
   border: 1px solid var(--rule);
   background: var(--section);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
 }
 
@@ -190,7 +191,7 @@ textarea {
   outline: 0;
   background: transparent;
   color: var(--ink);
-  font: normal 10px/1.25 Tahoma, "Noto Sans Thai", Arial, sans-serif;
+  font: normal 10px/1.2 Arial, Tahoma, "Noto Sans Thai", sans-serif;
 }
 
 
@@ -201,12 +202,12 @@ input[name$="_date"] { text-align: center; }
 input[name="total_days"] { text-align: center; }
 input[name="plant"] { text-align: center; }
 
-.overhaul-section { margin-top: 14px; }
+.overhaul-section { margin-top: 10px; }
 
 .overhaul-grid {
   display: grid;
   grid-template-columns: 30% 42% 28%;
-  height: 169px;
+  height: 162px;
   border: solid var(--rule);
   border-width: 0 1px 1px;
 }
@@ -278,7 +279,7 @@ input[name="plant"] { text-align: center; }
 .parts-table th:nth-child(7) { width: 9%; }
 .parts-table th:nth-child(8) { width: 17%; }
 
-.page-final { padding-top: 0.38in; }
+.page-final { padding-top: 0.28in; }
 .page-final .parts-section { margin-top: 0; }
 .page-final .parts-table tbody td { height: 20px; }
 .parts-table tfoot th,
@@ -296,28 +297,29 @@ input[name="plant"] { text-align: center; }
 .summary-grid {
   display: grid;
   grid-template-columns: 30% 38% 32%;
-  height: 230px;
-  border: solid var(--rule);
-  border-width: 0 1px 1px;
+  min-height: 230px;
+  border: 1px solid var(--rule);
 }
 
 .page-final .summary-grid {
-  position: absolute;
-  right: 0.54in;
-  bottom: 0.43in;
-  left: 0.54in;
+  position: relative;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  margin-top: 10px;
 }
 
 .page-continuation .summary-grid {
-  position: absolute;
-  right: 0.54in;
-  bottom: 0.43in;
-  left: 0.54in;
+  position: relative;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  margin-top: 10px;
 }
 
 .summary-column {
   position: relative;
-  padding: 39px 20px 12px;
+  padding: 38px 18px 14px;
   border-right: 1px solid var(--rule);
 }
 .summary-column:last-child { border-right: 0; }
@@ -333,7 +335,7 @@ input[name="plant"] { text-align: center; }
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 31px;
+  min-height: 33px;
   white-space: nowrap;
 }
 .check-field input {
@@ -352,7 +354,11 @@ input[name="plant"] { text-align: center; }
   text-align: center;
 }
 .reason-field { margin-top: 5px; }
-.result-column > .standalone-line { margin-top: 18px; }
+.result-column > .standalone-line {
+  display: block;
+  width: 100%;
+  margin-top: 16px;
+}
 
 .handover-column { padding: 28px 16px 0; }
 .signature-block { height: 88px; padding-top: 9px; }
@@ -360,17 +366,21 @@ input[name="plant"] { text-align: center; }
 .approval-block { border-top: 1px solid var(--rule); }
 .approval-block h3 { margin: 0 0 7px; text-align: center; font-size: 10px; }
 
-.customer-acceptance { padding-right: 20px; padding-left: 20px; }
+.customer-acceptance { padding-right: 18px; padding-left: 18px; }
 .accept-row { display: grid; grid-template-columns: 78px 1fr; align-items: end; }
-.customer-acceptance > .standalone-line { margin-top: 10px; }
-.customer-sign { margin-top: 25px; }
+.customer-acceptance > .standalone-line {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+}
+.customer-sign { margin-top: 24px; }
 .customer-acceptance > .line-field:last-child { margin-top: 7px; }
 
 .page-footer {
   position: absolute;
-  right: 0.46in;
-  bottom: 0.12in;
-  left: 0.46in;
+  right: 0.32in;
+  bottom: 0.1in;
+  left: 0.32in;
   display: flex;
   justify-content: space-between;
   padding-top: 6px;
@@ -392,7 +402,7 @@ input[name="plant"] { text-align: center; }
 @media print {
   .csv-toolbar { display: none; }
   #csv-status { display: none !important; }
-  @page { size: letter landscape; margin: 0; }
+  @page { size: A4 landscape; margin: 0; }
   html, body { background: #fff; }
   .document { display: block; padding: 0; }
   .page {
