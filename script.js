@@ -707,7 +707,11 @@ document.querySelector('#export-pdf').addEventListener('click', async (event) =>
       margin: [0, 3, 0, 3]
     });
     const line = (label, value) => ({
-      columns: [text(label, 'left', true), { text: richText(value || ' '), decoration: 'underline' }],
+      columns: [text(label, 'left', true), {
+         text: richText(value || ' '), 
+         decoration: 'underline',
+         opacity: 0.5 
+        }],
       columnGap: 4,
       margin: [0, 1, 0, 1]
     });
