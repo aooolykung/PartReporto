@@ -124,10 +124,10 @@ h2, h3, p { margin: 0; }
 }
 
 .field-grid { display: grid; }
-.row-one { grid-template-columns: 31% 20% 49%; }
-.row-two { grid-template-columns: 55% 45%; }
-.row-three { grid-template-columns: 25% 35% 40%; }
-.row-four { grid-template-columns: 18% 22% 34% 26%; }
+.row-one { grid-template-columns: 33.33% 33.33% 33.34%; }
+.row-two { grid-template-columns: 33.33% 66.67%; }
+.row-three { grid-template-columns: 33.33% 33.33% 33.34%; }
+.row-four { grid-template-columns: 33.33% 33.33% 33.34%; }
 .row-five { grid-template-columns: 72% 28%; }
 
 .field {
