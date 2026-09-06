@@ -68,6 +68,10 @@ updateTotalDays();
 updateResultStatus();
 
 const partTables = [...document.querySelectorAll('.parts-table')];
+// Keep a detached template: pagination temporarily empties the live tbody.
+const partRowTemplates = new Map(partTables.map((table) => [
+  table, table.querySelector('tbody tr').cloneNode(true)
+]));
 const partGroups = partTables.map((table, index) => {
   const hasSummary = Boolean(table.closest('.page')?.querySelector('.summary-grid'));
   const sourcePage = table.closest('.page');
@@ -93,6 +97,16 @@ partGroups.forEach((group) => {
   });
 });
 
+function getGroupRows(group) {
+  const sourceRows = [...group.sourceTbody.querySelectorAll('tr')];
+  const continuationRows = group.continuationPages
+    .flatMap((page) => [...page.querySelectorAll('tbody tr')]);
+
+  return group.summary
+    ? [...continuationRows, ...sourceRows]
+    : [...sourceRows, ...continuationRows];
+}
+
 function rowHasContent(row) {
   return [...row.querySelectorAll('input')]
     .slice(1)
@@ -100,8 +114,9 @@ function rowHasContent(row) {
 }
 
 function createBlankRow(sourceTable, groupName) {
-  const row = sourceTable.querySelector('tbody tr').cloneNode(true);
+  const row = partRowTemplates.get(sourceTable).cloneNode(true);
   row.dataset.partsGroup = groupName;
+  delete row.dataset.hasContent;
   row.querySelectorAll('input').forEach((input) => {
     input.value = '';
     input.removeAttribute('readonly');
@@ -133,8 +148,12 @@ function createContinuationPage(group) {
   footer.innerHTML = '<span>ใบบันทึกการเปลี่ยนอะไหล่เครื่องจักร</span><strong></strong>';
   page.append(footer);
 
-  const lastPage = group.continuationPages.at(-1) || group.sourcePage;
-  lastPage.after(page);
+  if (group.summary) {
+    group.sourcePage.before(page);
+  } else {
+    const lastPage = group.continuationPages.at(-1) || group.sourcePage;
+    lastPage.after(page);
+  }
   group.continuationPages.push(page);
   return tbody;
 }
@@ -143,10 +162,7 @@ function renumberAllRows() {
   let sequence = 1;
 
   partGroups.forEach((group) => {
-    const rows = [
-      ...group.sourceTbody.querySelectorAll('tr'),
-      ...group.continuationPages.flatMap((page) => [...page.querySelectorAll('tbody tr')])
-    ];
+    const rows = getGroupRows(group);
 
     rows.forEach((row) => {
       row.querySelectorAll('input').forEach((input, inputIndex) => {
@@ -169,10 +185,58 @@ function rebalanceGroup(group) {
   const activeSelection = activeElement?.tagName === 'INPUT'
     ? { start: activeElement.selectionStart, end: activeElement.selectionEnd }
     : null;
-  const rows = [
-    ...group.sourceTbody.querySelectorAll('tr'),
-    ...group.continuationPages.flatMap((page) => [...page.querySelectorAll('tbody tr')])
-  ];
+  const rows = getGroupRows(group);
+
+  if (group.summary) {
+    const middlePageCapacity = 30;
+    const finalPageCapacity = 10;
+    const requiredPages = Math.ceil(
+      Math.max(0, rows.length - finalPageCapacity) / middlePageCapacity
+    );
+
+    while (group.continuationPages.length < requiredPages) {
+      createContinuationPage(group);
+    }
+    while (group.continuationPages.length > requiredPages) {
+      group.continuationPages.pop().remove();
+    }
+
+    const middleBodies = group.continuationPages
+      .map((page) => page.querySelector('tbody'));
+    [...middleBodies, group.sourceTbody]
+      .forEach((tbody) => { tbody.replaceChildren(); });
+
+    const targetRowCount = (requiredPages * middlePageCapacity) + finalPageCapacity;
+    while (rows.length < targetRowCount) {
+      rows.push(createBlankRow(group.sourceTable, group.name));
+    }
+    const middleRowCount = requiredPages * middlePageCapacity;
+    rows.slice(0, middleRowCount).forEach((row, index) => {
+      middleBodies[Math.floor(index / middlePageCapacity)].append(row);
+    });
+    rows.slice(middleRowCount).forEach((row) => {
+      group.sourceTbody.append(row);
+    });
+    while (group.sourceTbody.rows.length < finalPageCapacity) {
+      group.sourceTbody.append(createBlankRow(group.sourceTable, group.name));
+    }
+
+    group.sourceTable.append(group.totalFooter);
+    group.sourcePage.querySelector('.page-footer').before(group.summary);
+
+    renumberAllRows();
+    updateTotals();
+    updatePageNumbers();
+
+    if (activeElement?.isConnected && activeElement.tagName === 'INPUT') {
+      activeElement.focus();
+      if (activeSelection) {
+        activeElement.setSelectionRange(activeSelection.start, activeSelection.end);
+      }
+    }
+    return;
+  }
+
   const pageCapacity = group.pageCapacity;
   const requiredPages = Math.max(
     0,
@@ -256,11 +320,21 @@ function updatePageNumbers() {
   });
 }
 
+function formatPrice(value) {
+  if (value === null || value === undefined || String(value).trim() === '') {
+    return '';
+  }
+  const number = Number(String(value).replace(/,/g, ''));
+  return Number.isFinite(number)
+    ? number.toLocaleString('en-US', {
+      minimumFractionDigits: 3,
+      maximumFractionDigits: 3
+    })
+    : String(value);
+}
+
 function updateTotals() {
-  const allRows = partGroups.flatMap((group) => [
-    ...group.sourceTbody.querySelectorAll('tr'),
-    ...group.continuationPages.flatMap((page) => [...page.querySelectorAll('tbody tr')])
-  ]);
+  const allRows = partGroups.flatMap(getGroupRows);
   const total = allRows.reduce((sum, row) => {
     const amountInput = row.querySelectorAll('input')[6];
     const amount = Number.parseFloat(amountInput?.value.replace(/,/g, '') || '0');
@@ -268,18 +342,12 @@ function updateTotals() {
   }, 0);
   const totalInput = partGroups.find((group) => group.summary)?.totalFooter.querySelector('input');
   if (totalInput) {
-    totalInput.value = total.toLocaleString('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
+    totalInput.value = formatPrice(total);
   }
 }
 
 function populateImportedParts(parts) {
-  const rows = partGroups.flatMap((group) => [
-    ...group.sourceTbody.querySelectorAll('tr'),
-    ...group.continuationPages.flatMap((page) => [...page.querySelectorAll('tbody tr')])
-  ]);
+  const rows = partGroups.flatMap(getGroupRows);
 
   parts.forEach(([materialNumber, description, amount, unit, price, documentNumber], index) => {
     const row = rows[index];
@@ -291,18 +359,16 @@ function populateImportedParts(parts) {
     inputs[1].value = combinePartDescription(materialNumber, description);
     inputs[3].value = amount;
     inputs[4].value = unit;
-    inputs[5].value = amount > 0 ? price / amount : '';
-    inputs[6].value = price;
+    inputs[5].value = amount > 0 ? formatPrice(price / amount) : '';
+    inputs[6].value = formatPrice(price);
     inputs[7].value = documentNumber;
     row.dataset.hasContent = 'true';
   });
 }
 
 function getCurrentPartRows() {
-  return partGroups.flatMap((group) => [
-    ...group.sourceTbody.querySelectorAll('tr'),
-    ...group.continuationPages.flatMap((page) => [...page.querySelectorAll('tbody tr')])
-  ]).map((row) => [...row.querySelectorAll('input')].map((input) => input.value));
+  return partGroups.flatMap(getGroupRows)
+    .map((row) => [...row.querySelectorAll('input')].map((input) => input.value));
 }
 
 function ensurePartRows(count) {
@@ -314,10 +380,7 @@ function ensurePartRows(count) {
 
 function populateSavedParts(parts) {
   ensurePartRows(parts.length);
-  const rows = partGroups.flatMap((group) => [
-    ...group.sourceTbody.querySelectorAll('tr'),
-    ...group.continuationPages.flatMap((page) => [...page.querySelectorAll('tbody tr')])
-  ]);
+  const rows = partGroups.flatMap(getGroupRows);
 
   parts.forEach((values, index) => {
     const row = rows[index];
@@ -325,7 +388,8 @@ function populateSavedParts(parts) {
       return;
     }
     row.querySelectorAll('input').forEach((input, inputIndex) => {
-      input.value = values[inputIndex] || '';
+      const value = values[inputIndex] ?? '';
+      input.value = inputIndex === 5 || inputIndex === 6 ? formatPrice(value) : value;
     });
     if (values.slice(1).some((value) => value !== '')) {
       row.dataset.hasContent = 'true';
@@ -751,7 +815,7 @@ document.querySelector('#export-pdf').addEventListener('click', async (event) =>
       const body = [headers.map((header) => text(header, 'center', true))];
       parts.slice(start, start + count).forEach((values, offset) => body.push([
         text(start + offset + 1, 'center'), text(values[1]), text(values[2], 'center'), text(values[3], 'center'),
-        text(values[4], 'center'), text(values[5], 'right'), text(values[6], 'right'), text(values[7])
+        text(values[4], 'center'), text(formatPrice(values[5]), 'right'), text(formatPrice(values[6]), 'right'), text(values[7])
       ]));
       if (total) {
         body.push([{ text: richText('รวมทั้งหมด (บาท)'), colSpan: 6, alignment: 'right', bold: true }, {}, {}, {}, {}, {}, text(totalAmount(), 'right'), '']);
@@ -875,6 +939,18 @@ partGroups.forEach((group) => {
   rebalanceGroup(group);
 });
 
+// Format after editing so typing a decimal does not move the cursor.
+document.addEventListener('change', (event) => {
+  const input = event.target;
+  const row = input.closest('.parts-table tbody tr');
+  if (!row || input.tagName !== 'INPUT') return;
+  const column = [...row.querySelectorAll('input')].indexOf(input);
+  if (column === 5 || column === 6) {
+    input.value = formatPrice(input.value);
+    updateTotals();
+  }
+});
+
 document.addEventListener('input', (event) => {
   const input = event.target;
   const row = input.closest('.parts-table tbody tr');
@@ -897,10 +973,7 @@ document.addEventListener('input', (event) => {
     structureChanged = true;
   }
 
-  const groupRows = [
-    ...group.sourceTbody.querySelectorAll('tr'),
-    ...group.continuationPages.flatMap((page) => [...page.querySelectorAll('tbody tr')])
-  ];
+  const groupRows = getGroupRows(group);
   const lastGroupRow = groupRows.at(-1);
   if (group !== partGroups[0] && row === lastGroupRow && rowHasContent(row)) {
     row.closest('tbody').append(createBlankRow(group.sourceTable, group.name));
